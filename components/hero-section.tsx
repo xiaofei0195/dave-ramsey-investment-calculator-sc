@@ -6,7 +6,11 @@ export default function HeroSection() {
   return (
     <section className="relative w-full py-24 md:py-32 lg:py-40 bg-gradient-to-br from-gray-900 to-gray-700 text-white dark:from-gray-950 dark:to-gray-800">
       <div className="container px-4 md:px-6 text-center">
+        {" "}
+        {/* text-center applied here */}
         <div className="space-y-6 max-w-3xl mx-auto">
+          {" "}
+          {/* mx-auto for block centering */}
           <h1 className="text-5xl font-extrabold tracking-tight sm:text-6xl md:text-7xl leading-tight">
             Unlock Your Financial Freedom
           </h1>
@@ -15,6 +19,8 @@ export default function HeroSection() {
             Dave Ramsey-inspired calculator.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            {" "}
+            {/* justify-center for button centering */}
             <Button
               onClick={() => {
                 document.getElementById("investment-calculator")?.scrollIntoView({ behavior: "smooth" })
