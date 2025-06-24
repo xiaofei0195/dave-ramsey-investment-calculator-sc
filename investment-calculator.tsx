@@ -852,7 +852,7 @@ export default function InvestmentCalculator() {
                     <div className="h-64 w-full">
                       <Chart data={scenarioData} /> {/* Removed title prop */}
                     </div>
-                    <div className="mt-4 text-sm">
+                    <div className="mt-4 text-sm pt-8">
                       <p>
                         <span className="font-semibold">Projected Final Value:</span>{" "}
                         {formatCurrency(scenarioData[scenarioData.length - 1]?.value || 0)}
