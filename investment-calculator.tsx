@@ -1,6 +1,8 @@
 "use client"
 
-import { useState, useEffect, useMemo } from "react"
+import type React from "react"
+
+import { useState, useEffect, useMemo, useRef } from "react" // Import useRef
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -40,12 +42,15 @@ const formatCurrency = (value: number) => {
   }).format(value)
 }
 
-// Updated Chart component to render bars and add year labels
+// Updated Chart component to render bars and add year labels with tooltip
 const Chart = ({
   data,
-  title,
   startYear = new Date().getFullYear(),
 }: { data: { name: string; value: number }[]; title?: string; startYear?: number }) => {
+  const [tooltipData, setTooltipData] = useState<{ year: number; value: number } | null>(null)
+  const [tooltipPosition, setTooltipPosition] = useState<{ x: number; y: number } | null>(null)
+  const chartRef = useRef<HTMLDivElement>(null) // Ref to the chart container
+
   if (!data || data.length === 0) {
     return <div className="text-center text-muted-foreground py-8">No data to display chart.</div>
   }
@@ -54,7 +59,13 @@ const Chart = ({
   const minVal = Math.min(...data.map((d) => d.value))
   const range = maxVal - minVal
 
-  const barWidth = 100 / data.length - 1 // Adjust for spacing
+  // Define the chart area within the SVG (0 to 100 for content)
+  const chartWidth = 100
+  const chartHeight = 100
+  const labelAreaWidth = 10 // Space for Y-axis labels on the left
+  const totalSvgWidth = chartWidth + labelAreaWidth
+
+  const barWidth = chartWidth / data.length - 1 // Adjust for spacing
   const barSpacing = 0.5 // Percentage of total width
 
   // Helper to get "nice" tick values for the Y-axis
@@ -84,48 +95,105 @@ const Chart = ({
 
   const yAxisTicks = getNiceTickValues(minVal, maxVal, 5) // Aim for 5-7 ticks
 
+  const handleMouseEnter = (event: React.MouseEvent<SVGRectElement>, d: { name: string; value: number }, i: number) => {
+    if (chartRef.current) {
+      const chartRect = chartRef.current.getBoundingClientRect()
+      const barRect = event.currentTarget.getBoundingClientRect()
+
+      // Position tooltip above the bar, centered horizontally
+      const x = barRect.left + barRect.width / 2 - chartRect.left
+      const y = barRect.top - chartRect.top - 40 // 40px above the bar
+
+      setTooltipData({ year: startYear + i, value: d.value })
+      setTooltipPosition({ x, y })
+    }
+  }
+
+  const handleMouseLeave = () => {
+    setTooltipData(null)
+    setTooltipPosition(null)
+  }
+
   return (
-    <div className="w-full h-72 relative pb-8">
+    <div ref={chartRef} className="w-full h-72 relative pb-8">
       {" "}
       {/* Increased height and added padding-bottom */}
-      {title && <h3 className="text-lg font-semibold mb-2">{title}</h3>}
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className="w-full h-64">
+      {/* Removed title rendering */}
+      <svg
+        viewBox={`-${labelAreaWidth} 0 ${totalSvgWidth} ${chartHeight}`}
+        preserveAspectRatio="none"
+        className="w-full h-64"
+      >
         {" "}
-        {/* Adjusted SVG height */}
+        {/* Adjusted SVG height and viewBox */}
         {/* Y-axis grid lines and labels */}
         {yAxisTicks.map((val, index) => {
-          const y = 100 - ((val - minVal) / range) * 100 // Normalize to SVG 0-100 scale
+          const y = chartHeight - ((val - minVal) / range) * chartHeight // Normalize to SVG 0-100 scale
           return (
             <g key={`y-axis-${index}`}>
-              <line x1="0" y1={y} x2="100" y2={y} stroke="#e0e0e0" strokeDasharray="2,2" />
-              <text x="-1" y={y} fontSize="3" fill="#666" textAnchor="end" dominantBaseline="middle">
+              <line x1="0" y1={y} x2={chartWidth} y2={y} stroke="#e0e0e0" strokeDasharray="2,2" />
+              <text x="-1" y={y} fontSize="3" fill="currentColor" textAnchor="end" dominantBaseline="middle">
                 {formatCurrency(val)}
               </text>
             </g>
           )
         })}
+        {/* Vertical grid lines */}
+        {[0, 25, 50, 75, 100].map((xPercent, index) => (
+          <line
+            key={`x-grid-${index}`}
+            x1={xPercent}
+            y1="0"
+            x2={xPercent}
+            y2={chartHeight}
+            stroke="#e0e0e0"
+            strokeDasharray="2,2"
+          />
+        ))}
         {/* Bars */}
         {data.map((d, i) => {
-          const x = (i / data.length) * 100
-          const height = ((d.value - minVal) / range) * 100
-          const y = 100 - height
+          const x = (i / data.length) * chartWidth
+          const height = ((d.value - minVal) / range) * chartHeight
+          const y = chartHeight - height
           return (
-            <rect key={i} x={x + barSpacing / 2} y={y} width={barWidth - barSpacing} height={height} fill="#8884d8" />
+            <rect
+              key={i}
+              x={x + barSpacing / 2}
+              y={y}
+              width={barWidth - barSpacing}
+              height={height}
+              fill="#e0e0e0"
+              onMouseEnter={(e) => handleMouseEnter(e, d, i)}
+              onMouseLeave={handleMouseLeave}
+            />
           )
         })}
       </svg>
-      {/* X-axis labels (simplified to match image's sparse labels) */}
+      {/* X-axis labels (adjusted for 32 years) */}
       <div className="absolute bottom-0 left-0 right-0 flex justify-between text-xs text-muted-foreground px-2">
         {data.length > 0 && (
           <>
             <span className="absolute left-[0%] translate-x-[-50%]">{startYear}</span>
-            <span className="absolute left-[26.6%] translate-x-[-50%]">{startYear + 8}</span>
-            <span className="absolute left-[53.3%] translate-x-[-50%]">{startYear + 16}</span>
-            <span className="absolute left-[80%] translate-x-[-50%]">{startYear + 24}</span>
-            <span className="absolute right-[0%] translate-x-[50%]">{startYear + data.length - 1}</span>
+            <span className="absolute left-[25%] translate-x-[-50%]">{startYear + 8}</span>
+            <span className="absolute left-[50%] translate-x-[-50%]">{startYear + 16}</span>
+            <span className="absolute left-[75%] translate-x-[-50%]">{startYear + 24}</span>
+            <span className="absolute left-[100%] translate-x-[-50%]">{startYear + data.length - 1}</span>
           </>
         )}
       </div>
+      {/* Tooltip */}
+      {tooltipData && tooltipPosition && (
+        <div
+          className="absolute bg-gray-800 text-white text-xs px-2 py-1 rounded shadow-lg pointer-events-none z-10"
+          style={{
+            left: tooltipPosition.x,
+            top: tooltipPosition.y,
+            transform: "translateX(-50%)", // Center horizontally
+          }}
+        >
+          {tooltipData.year}: {formatCurrency(tooltipData.value)}
+        </div>
+      )}
     </div>
   )
 }
@@ -162,8 +230,8 @@ export default function InvestmentCalculator() {
   const [recessionReturnRate, setRecessionReturnRate] = useState(-15)
   const [recessionStartYear, setRecessionStartYear] = useState(10)
   const [recessionDuration, setRecessionDuration] = useState(2) // years
-  const [incomeGrowthRate, setIncomeGrowthRate] = useState(2)
   const [scenarioData, setScenarioData] = useState<{ name: string; value: number }[]>([])
+  const [incomeGrowthRate, setIncomeGrowthRate] = useState(0) // Declare incomeGrowthRate
 
   // New state variables for "What if" scenarios
   const [extra100Growth, setExtra100Growth] = useState(0)
@@ -174,7 +242,7 @@ export default function InvestmentCalculator() {
 
   // Compound Interest Calculation
   const calculateCompoundGrowth = useMemo(() => {
-    return (principal: number, monthlyContribution: number, annualRate: number, years = 30) => {
+    return (principal: number, monthlyContribution: number, annualRate: number, years = 32) => {
       const data = []
       let currentPrincipal = principal
       let totalContributions = 0 // Reset to only count periodic contributions
@@ -202,6 +270,7 @@ export default function InvestmentCalculator() {
       initialPrincipal,
       monthlyContribution,
       annualReturnRate[0],
+      32, // Explicitly set years to 32
     )
     setCompoundGrowthData(data)
     setFinalValue(finalValue)
@@ -295,7 +364,7 @@ export default function InvestmentCalculator() {
       recessionStartYear: number,
       recessionDuration: number, // in years
       incomeGrowthRate: number,
-      years = 30,
+      years = 32, // Changed default years to 32
     ) => {
       const baseData = []
       // For simplicity with the basic Chart component, we'll only return one series.
@@ -344,6 +413,7 @@ export default function InvestmentCalculator() {
       recessionStartYear,
       recessionDuration,
       incomeGrowthRate,
+      32, // Explicitly set years to 32
     )
     setScenarioData(baseData)
   }, [
@@ -367,6 +437,7 @@ export default function InvestmentCalculator() {
       initialPrincipal,
       monthlyContribution + 100,
       annualReturnRate[0],
+      32, // Explicitly set years to 32
     )
     setExtra100Growth(finalValueExtra100 - baseFinalValue)
 
@@ -375,6 +446,7 @@ export default function InvestmentCalculator() {
       initialPrincipal,
       monthlyContribution + 128,
       annualReturnRate[0],
+      32, // Explicitly set years to 32
     )
     setCoffeeGrowth(finalValueCoffee - baseFinalValue)
 
@@ -383,21 +455,27 @@ export default function InvestmentCalculator() {
       initialPrincipal,
       monthlyContribution + 200,
       annualReturnRate[0],
+      32, // Explicitly set years to 32
     )
     setRestaurantGrowth(finalValueRestaurant - baseFinalValue)
   }, [initialPrincipal, monthlyContribution, annualReturnRate, finalValue, calculateCompoundGrowth])
 
   return (
-    <div className="mx-auto max-w-4xl py-8 px-4">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-4xl font-bold">Dave Ramsey Investment Calculator</h1>
-        <ThemeToggle /> {/* Add the ThemeToggle here */}
+    <div id="investment-calculator" className="mx-auto max-w-4xl py-12 px-4 md:py-16 lg:py-20">
+      {" "}
+      {/* Added id="investment-calculator" */}
+      <div className="flex flex-col items-center justify-center text-center mb-12">
+        {" "}
+        {/* Centered content */}
+        <h1 className="text-4xl font-bold mb-4">Dave Ramsey Investment Calculator</h1>
+        <p className="text-muted-foreground max-w-2xl">
+          Plan your financial future with Dave Ramsey's principles. Understand compound growth, optimize debt payoff vs.
+          investing, and simulate various economic scenarios.
+        </p>
+        <div className="mt-6">
+          <ThemeToggle /> {/* ThemeToggle remains here */}
+        </div>
       </div>
-      <p className="text-center text-muted-foreground mb-8">
-        Plan your financial future with Dave Ramsey's principles. Understand compound growth, optimize debt payoff vs.
-        investing, and simulate various economic scenarios.
-      </p>
-
       <Tabs defaultValue="compound-growth" className="w-full" value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="compound-growth">Compound Growth</TabsTrigger>
@@ -410,7 +488,7 @@ export default function InvestmentCalculator() {
           <Card>
             <CardHeader>
               <CardTitle>Compound Growth Engine</CardTitle>
-              <CardDescription>Visualize your wealth growth over 30 years with consistent investing.</CardDescription>
+              <CardDescription>Visualize your wealth growth over 32 years with consistent investing.</CardDescription>
             </CardHeader>
             {/* New Summary Section */}
             <div className="grid grid-cols-3 gap-4 p-4">
@@ -476,7 +554,7 @@ export default function InvestmentCalculator() {
               <div className="grid gap-4">
                 <Card className="bg-muted/20">
                   <CardHeader>
-                    <CardTitle>Projected Growth (30 Years)</CardTitle>
+                    <CardTitle>Projected Growth (32 Years)</CardTitle>
                   </CardHeader>
                   <CardContent className="grid gap-2">
                     <div className="flex justify-between">
@@ -495,7 +573,7 @@ export default function InvestmentCalculator() {
                   </CardContent>
                 </Card>
                 <div className="h-64 w-full">
-                  <Chart data={compoundGrowthData} title="Investment Growth Over 30 Years" />
+                  <Chart data={compoundGrowthData} /> {/* Removed title prop */}
                 </div>
               </div>
             </CardContent>
@@ -772,7 +850,7 @@ export default function InvestmentCalculator() {
                       charting library would be used.)
                     </p>
                     <div className="h-64 w-full">
-                      <Chart data={scenarioData} title="Investment Growth Scenarios" />
+                      <Chart data={scenarioData} /> {/* Removed title prop */}
                     </div>
                     <div className="mt-4 text-sm">
                       <p>
@@ -787,7 +865,6 @@ export default function InvestmentCalculator() {
           </Card>
         </TabsContent>
       </Tabs>
-
       <CardFooter className="mt-8 text-center text-sm text-muted-foreground">
         Disclaimer: This calculator is for informational purposes only and does not constitute financial advice. Consult
         a qualified financial professional for personalized guidance.
