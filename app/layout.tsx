@@ -1,6 +1,7 @@
 import type React from "react"
 import "./globals.css"
 import { ThemeProvider } from "@/components/theme-provider" // Import ThemeProvider
+import GoogleAnalytics from '@/components/GoogleAnalytics'
 
 export const metadata = {
   title: "Dave Ramsey Investment Calculator - Plan Your Financial Future",
@@ -43,6 +44,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
+      <GoogleAnalytics />
       <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           {children}
